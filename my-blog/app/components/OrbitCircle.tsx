@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useId, useState } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
+
+export type OrbitHandle = { setDistort: (v: number) => void; freeze: (f: boolean) => void };
 
 type OrbitCircleProps = {
   size?: number;
@@ -20,45 +22,64 @@ type OrbitCircleProps = {
   typeFontSize?: number;
 };
 
-const SEG = 22; // ring segments, so parts can break red
+const SEG = 22;
 
-export default function OrbitCircle({
-  size = 260,
-  color = "#46577a",
-  duration = 5,
-  glitch = 6,
-  label = "This is You",
-  lineLength = 70,
-  waviness = 6,
-  leftLabel = "Everything You ever done, or will do you gonna do over and over again",
-  leftLineLength = 120,
-  leftFontSize = 15,
-  leftColor = "#141414",
-  highlight = "#c0392b",
-  typeMessage = "You can not break the loop!\nEvery time, you make the same mistakes.\nAnd every time, you loose Hope\nBecause you can't get rid of your emotions",
-  typeTop = "5%",
-  typeLeft = "66%",
-  typeFontSize = 13,
-}: OrbitCircleProps) {
+const OrbitCircle = forwardRef<OrbitHandle, OrbitCircleProps>(function OrbitCircle(
+  {
+    size = 260,
+    color = "#46577a",
+    duration = 5,
+    glitch = 6,
+    label = "This is You",
+    lineLength = 70,
+    waviness = 6,
+    leftLabel = "Everything You ever done, or will do you gonna do over and over again",
+    leftLineLength = 120,
+    leftFontSize = 15,
+    leftColor = "#141414",
+    highlight = "#c0392b",
+    typeMessage = "You can not break the loop!\nEvery time, you make the same mistakes.\nAnd every time, you loose Hope\nBecause you can't get rid of your emotions",
+    typeTop = "5%",
+    typeLeft = "66%",
+    typeFontSize = 13,
+  },
+  ref
+) {
   const uid = useId().replace(/:/g, "");
   const glitchId = `glitch-${uid}`;
   const inkId = `ink-${uid}`;
 
-  // --- animated state ---
+  const turbRef = useRef<SVGFETurbulenceElement>(null);
+  const dispRef = useRef<SVGFEDisplacementMapElement>(null);
+
   const [thisOpacity, setThisOpacity] = useState(0);
   const [leftOpacity, setLeftOpacity] = useState(0);
   const [typeOpacity, setTypeOpacity] = useState(0);
   const [typed, setTyped] = useState("");
   const [caretOn, setCaretOn] = useState(false);
   const [redSet, setRedSet] = useState<Set<number>>(new Set());
+  const [frozen, setFrozen] = useState(false);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setDistort(v: number) {
+        const vv = Math.max(0, v);
+        dispRef.current?.setAttribute("scale", (glitch + vv * 42).toFixed(2));
+        turbRef.current?.setAttribute("baseFrequency", (0.05 + vv * 0.08).toFixed(4));
+      },
+      freeze(f: boolean) {
+        setFrozen(f);
+      },
+    }),
+    [glitch]
+  );
 
   useEffect(() => {
     let cancelled = false;
     const timers: number[] = [];
-    const wait = (ms: number) =>
-      new Promise<void>((res) => timers.push(window.setTimeout(res, ms)));
+    const wait = (ms: number) => new Promise<void>((res) => timers.push(window.setTimeout(res, ms)));
 
-    // BEAT 1 — "This is You", its own random timer
     const loopThis = async () => {
       while (!cancelled) {
         await wait(2000 + Math.random() * 5000);
@@ -69,8 +90,6 @@ export default function OrbitCircle({
         await wait(1200);
       }
     };
-
-    // BEAT 2 — left recurrence line, its own random timer
     const loopLeft = async () => {
       while (!cancelled) {
         await wait(3000 + Math.random() * 6000);
@@ -81,8 +100,6 @@ export default function OrbitCircle({
         await wait(1200);
       }
     };
-
-    // BEAT 3 — typed warning + red shake, its own random timer
     const loopType = async () => {
       while (!cancelled) {
         await wait(4000 + Math.random() * 6000);
@@ -116,11 +133,17 @@ export default function OrbitCircle({
     };
   }, [typeMessage]);
 
+  // when frozen, all messages snap visible and hold
+  const thisShown = frozen ? 1 : thisOpacity;
+  const leftShown = frozen ? 1 : leftOpacity;
+  const typeShown = frozen ? 1 : typeOpacity;
+  const typedShown = frozen ? typeMessage : typed;
+  const caretShown = frozen ? false : caretOn;
+
   // --- geometry ---
   const d = 10;
   const leftLine = Math.max(leftLineLength, lineLength + 50);
 
-  // wrap left message
   const maxChars = 20;
   const lines: string[] = [];
   let cur = "";
@@ -134,7 +157,6 @@ export default function OrbitCircle({
   const maxLineLen = Math.max(...lines.map((l) => l.length));
   const textWidth = maxLineLen * leftFontSize * 0.5;
 
-  // symmetric canvas (circle centered)
   const labelHalf = (label.length * 14 * 0.62) / 2;
   const orbitPad = lineLength + labelHalf + 24;
   const gap = 8;
@@ -148,7 +170,6 @@ export default function OrbitCircle({
   const cy = orbitPad + r;
   const dotY = cy - r;
 
-  // ring segments
   const segs = Array.from({ length: SEG }, (_, i) => {
     const a0 = (i / SEG) * Math.PI * 2 - Math.PI / 2;
     const a1 = ((i + 1) / SEG) * Math.PI * 2 - Math.PI / 2;
@@ -157,7 +178,6 @@ export default function OrbitCircle({
     return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
   });
 
-  // wavy orbit tether
   const y0 = dotY - d / 2;
   const labelY = dotY - lineLength;
   const waves = 3;
@@ -170,7 +190,6 @@ export default function OrbitCircle({
     wavy += ` Q ${cx + waviness * dir} ${cyq} ${cx} ${ey}`;
   }
 
-  // messy ink line (left)
   const lx0 = cx - r, lx1 = cx - r - leftLine;
   let ink = `M ${lx0} ${cy}`;
   for (let i = 1; i <= 14; i++) {
@@ -179,7 +198,6 @@ export default function OrbitCircle({
     ink += ` L ${x.toFixed(1)} ${(cy + j).toFixed(1)}`;
   }
 
-  // left message layout + red first "You"
   const messageRight = cx - r - leftLine - gap;
   const startX = messageRight - textWidth;
   const lineH = leftFontSize * 1.45;
@@ -209,13 +227,13 @@ export default function OrbitCircle({
         @keyframes blink-${uid} {0%,50%{opacity:1}51%,100%{opacity:0}}
       `}</style>
 
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: "100%", height: "auto", display: "block" }} aria-hidden="true">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: "100%", height: "auto", display: "block", overflow: "visible" }} aria-hidden="true">
         <defs>
-          <filter id={glitchId} x="-30%" y="-30%" width="160%" height="160%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="1" result="noise">
+          <filter id={glitchId} x="-80%" y="-80%" width="260%" height="260%">
+            <feTurbulence ref={turbRef} type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="1" result="noise">
               <animate attributeName="seed" values="1;6;2;9;3;7;1" dur="0.55s" repeatCount="indefinite" calcMode="discrete" />
             </feTurbulence>
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale={glitch} xChannelSelector="R" yChannelSelector="G" />
+            <feDisplacementMap ref={dispRef} in="SourceGraphic" in2="noise" scale={glitch} xChannelSelector="R" yChannelSelector="G" />
           </filter>
           <filter id={inkId} x="-20%" y="-200%" width="140%" height="500%">
             <feTurbulence type="fractalNoise" baseFrequency="0.9 0.35" numOctaves="2" seed="4" result="n" />
@@ -223,7 +241,6 @@ export default function OrbitCircle({
           </filter>
         </defs>
 
-        {/* ring (breaks red on the climax) */}
         <g filter={`url(#${glitchId})`}>
           {segs.map((path, i) => {
             const red = redSet.has(i);
@@ -241,8 +258,7 @@ export default function OrbitCircle({
           })}
         </g>
 
-        {/* left annotation */}
-        <g style={{ opacity: leftOpacity, transition: "opacity 0.9s ease" }}>
+        <g style={{ opacity: leftShown, transition: "opacity 0.9s ease" }}>
           <path d={ink} fill="none" stroke="#1a1a1a" strokeWidth="2.4" strokeLinecap="round" filter={`url(#${inkId})`} />
           {lines.map((line, i) => (
             <text key={i} x={startX} y={startY + i * lineH} textAnchor="start" dominantBaseline="middle" fontFamily="Georgia, 'Times New Roman', serif" fontStyle="italic" fontSize={leftFontSize} fill={leftColor}>
@@ -251,12 +267,11 @@ export default function OrbitCircle({
           ))}
         </g>
 
-        {/* the orbiting pixel (always) + "This is You" tag */}
         <g>
           <rect x={cx - d / 2} y={dotY - d / 2} width={d} height={d} fill={color}>
             <animate attributeName="opacity" values="1;0.4;1" dur="1.4s" repeatCount="indefinite" />
           </rect>
-          <g style={{ opacity: thisOpacity, transition: "opacity 0.9s ease" }}>
+          <g style={{ opacity: thisShown, transition: "opacity 0.9s ease" }}>
             <path d={wavy} fill="none" stroke={color} strokeWidth="1.5" />
             <g>
               <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${labelY}`} to={`-360 ${cx} ${labelY}`} dur={`${duration}s`} repeatCount="indefinite" />
@@ -269,7 +284,6 @@ export default function OrbitCircle({
         </g>
       </svg>
 
-      {/* typed warning */}
       <div
         style={{
           position: "absolute",
@@ -282,14 +296,16 @@ export default function OrbitCircle({
           lineHeight: 1.8,
           color: "#28324c",
           whiteSpace: "pre",
-          opacity: typeOpacity,
+          opacity: typeShown,
           transition: "opacity 0.9s ease",
           pointerEvents: "none",
         }}
       >
-        {typed}
-        {caretOn && <span style={{ fontStyle: "normal", animation: `blink-${uid} 1s steps(1) infinite` }}>▋</span>}
+        {typedShown}
+        {caretShown && <span style={{ fontStyle: "normal", animation: `blink-${uid} 1s steps(1) infinite` }}>▋</span>}
       </div>
     </div>
   );
-}
+});
+
+export default OrbitCircle;

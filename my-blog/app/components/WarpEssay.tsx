@@ -16,7 +16,7 @@ const TREMBLE_SPEED = 0.28;   // seconds per shake cycle (smaller = more nervous
 const WAVE_SPEED = 2.4;       // seconds per wave for the {w|wavy} phrases
 
 // Phrase colors
-const RED = "#c0392b";        // the blog's red
+const RED = "#780000";        // deep red for bold / very bold phrases
 const LIGHT_RED = "#d9776b";  // softer red for single words
 
 // How far the essay slides up under the orbit, so paragraphs appear as the circle breaks.

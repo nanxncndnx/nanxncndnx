@@ -2,6 +2,7 @@ import { getContentBySlug, getContent } from '@/lib/content';
 import { remark } from 'remark';
 import html from 'remark-html';
 import Link from 'next/link';
+import PdfPages from '@/app/components/PdfPages';
 
 export async function generateStaticParams() {
   try {
@@ -35,12 +36,7 @@ export default async function Doc({ params }: { params: Promise<{ slug: string }
               Open PDF in a new tab
             </a>
           </p>
-          <object data={pdfUrl} type="application/pdf" className="w-full h-[85vh] rounded border">
-            <p className="p-6 text-gray-700">
-              Your browser can&apos;t show the PDF here.{' '}
-              <a href={pdfUrl} className="text-blue-600 hover:underline">Download it instead.</a>
-            </p>
-          </object>
+          <PdfPages url={pdfUrl} />
         </article>
       </div>
     );

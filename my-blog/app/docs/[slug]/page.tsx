@@ -19,6 +19,33 @@ export async function generateStaticParams() {
 export default async function Doc({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;  // <-- AWAIT params here!
   const doc = getContentBySlug('docs', slug);
+
+  if (doc.pdf) {
+    const pdfUrl = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/docs-pdf/${encodeURIComponent(doc.pdf)}`;
+    return (
+      <div className="max-w-5xl mx-auto px-8 py-12">
+        <Link href="/docs" className="text-blue-600 hover:underline mb-8 inline-block">
+          ← Back to Docs
+        </Link>
+
+        <article>
+          <h1 className="text-4xl font-bold mb-2">{doc.title}</h1>
+          <p className="text-gray-600 mb-8">
+            <a href={pdfUrl} target="_blank" rel="noopener" className="text-blue-600 hover:underline">
+              Open PDF in a new tab
+            </a>
+          </p>
+          <object data={pdfUrl} type="application/pdf" className="w-full h-[85vh] rounded border">
+            <p className="p-6 text-gray-700">
+              Your browser can&apos;t show the PDF here.{' '}
+              <a href={pdfUrl} className="text-blue-600 hover:underline">Download it instead.</a>
+            </p>
+          </object>
+        </article>
+      </div>
+    );
+  }
+
   const processedContent = await remark().use(html).process(doc.content);
   const contentHtml = processedContent.toString();
 

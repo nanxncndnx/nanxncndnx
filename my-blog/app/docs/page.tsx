@@ -20,8 +20,9 @@ export default function Docs() {
                   {doc.title}
                 </h2>
               </Link>
-              <p className="text-gray-600 text-sm mt-2">{doc.date}</p>
-              <p className="mt-3 text-gray-700">{doc.excerpt}</p>
+              {doc.pdf && <p className="text-gray-600 text-sm mt-2">PDF</p>}
+              {doc.date && <p className="text-gray-600 text-sm mt-2">{doc.date}</p>}
+              {doc.excerpt && <p className="mt-3 text-gray-700">{doc.excerpt}</p>}
             </article>
           ))}
         </div>

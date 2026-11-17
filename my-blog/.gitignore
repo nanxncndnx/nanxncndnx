@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PDF docs copied from docs/ at build time (scripts/copy-doc-pdfs.mjs)
+/public/docs-pdf/
